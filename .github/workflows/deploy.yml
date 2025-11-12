@@ -52,7 +52,8 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         envs: FLASK_SECRET_KEY
         
-        # === BẮT ĐẦU SỬA KỊCH BẢN CHO UBUNTU ===
+        # ===  KỊCH BẢN CHO UBUNTU ===
+        
         script: |
           echo "Deploying at $(date -u '+%Y-%m-%d %H:%M:%S')"
           
@@ -61,4 +62,31 @@ jobs:
           sudo apt install docker.io git -y
           
           # 2. Clone hoặc cập nhật code
-          cd ~/
+          # Tự động clone repo hiện tại (repo của bạn)
+          cd ~/task-tracker || git clone $GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git ~/task-tracker
+          cd ~/task-tracker
+          git fetch
+          git reset --hard origin/main
+          
+          # 3. Sửa lỗi Permission: Chạy các lệnh docker bằng 'sudo'
+          
+          # Đảm bảo volume tồn tại
+          sudo docker volume create task-tracker-data
+          
+          # Dừng và xóa container cũ
+          sudo docker stop task-tracker || true
+          sudo docker rm task-tracker || true
+          
+          # Build ảnh mới
+          sudo docker build -t task-tracker .
+          
+          # Chạy container mới với các biến môi trường
+          sudo docker run -d \
+            --name task-tracker \
+            -p 8080:8080 \
+            -v task-tracker-data:/app/instance \
+            -e SECRET_KEY="${FLASK_SECRET_KEY}" \
+            -e FLASK_ENV=production \
+            -e PYTHONUNBUFFERED=1 \
+            --restart unless-stopped \
+            task-tracker
