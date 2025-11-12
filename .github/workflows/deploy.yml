@@ -46,48 +46,19 @@ jobs:
     
     - name: Deploy to EC2
       uses: appleboy/ssh-action@master
-      env:
-        FLASK_SECRET_KEY: ${{ secrets.FLASK_SECRET_KEY }}
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         envs: FLASK_SECRET_KEY
+        
+        # === BẮT ĐẦU SỬA KỊCH BẢN CHO UBUNTU ===
         script: |
           echo "Deploying at $(date -u '+%Y-%m-%d %H:%M:%S')"
           
-          cd ~/task-tracker || git clone https://github.com/min-hit-1701/task-tracker.git ~/task-tracker
-          cd ~/task-tracker
-          git fetch
-          git reset --hard origin/main
+          # 1. Cài đặt Git và Docker bằng apt
+          sudo apt update -y
+          sudo apt install docker.io git -y
           
-          sudo systemctl start docker
-          sudo systemctl enable docker
-          sudo usermod -aG docker $USER
-          
-          # Ensure data persistence
-          docker volume create task-tracker-data
-          
-          # Stop and remove existing container
-          docker stop task-tracker || true
-          docker rm task-tracker || true
-          
-          # Build new image
-          docker build -t task-tracker .
-          
-          # Run with proper permissions and environment
-          docker run -d \
-            --name task-tracker \
-            -p 8080:8080 \
-            -v task-tracker-data:/app/instance \
-            -e SECRET_KEY="${FLASK_SECRET_KEY}" \
-            -e FLASK_ENV=production \
-            -e PYTHONUNBUFFERED=1 \
-            --restart unless-stopped \
-            task-tracker
-          
-          # Wait for container to start and check logs
-          sleep 5
-          docker logs task-tracker
-          
-          echo "Deployment completed at $(date -u '+%Y-%m-%d %H:%M:%S')"
+          # 2. Clone hoặc cập nhật code
+          cd ~/

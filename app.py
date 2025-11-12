@@ -7,24 +7,28 @@ from datetime import datetime
 import os
 import socket
 
-app = Flask(__name__)
-
+app = Flask(__name__, instance_relative_config=True)
+# Đảm bảo thư mục instance tồn tại
+try:
+    os.makedirs(app.instance_path)
+except OSError:
+    pass
 # Set base directory for the app
-basedir = os.path.abspath(os.path.dirname(__file__))
+
 
 # Basic configurations
 app.config.update(
     SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key'),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     TESTING=False,
-    DATA_FILE=os.path.join(basedir, 'data', 'tasks.json')
+    DATA_FILE=os.path.join(app.instance_path, 'tasks.json')
 )
 
 # Set the database URI based on testing mode
 if app.config['TESTING']:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "app.db")}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(app.instance_path, "app.db")}'
 
 # Initialize extensions
 db.init_app(app)
