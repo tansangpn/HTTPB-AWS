@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Project Task Tracker - AWS</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Project Task Tracker</h1>
+        <div class="environment-badge">
+            {{ environment }}
+        </div>
+        
+        <div class="task-form">
+            <h2>Thêm Task Mới</h2>
+            <form id="taskForm">
+                <input type="text" id="taskTitle" placeholder="Tên task" required>
+                <textarea id="taskDescription" placeholder="Mô tả task" required></textarea>
+                <select id="taskPriority" required>
+                    <option value="low">Thấp</option>
+                    <option value="medium">Trung bình</option>
+                    <option value="high">Cao</option>
+                </select>
+                <button type="submit">Thêm Task</button>
+            </form>
+        </div>
+
+        <div class="tasks-container">
+            <h2>Danh Sách Tasks</h2>
+            <div class="task-filters">
+                <button onclick="filterTasks('all')" class="active">Tất cả</button>
+                <button onclick="filterTasks('pending')">Đang chờ</button>
+                <button onclick="filterTasks('in-progress')">Đang làm</button>
+                <button onclick="filterTasks('completed')">Hoàn thành</button>
+            </div>
+            <div id="tasksList">
+                {% for task in tasks %}
+                <div class="task-card" data-status="{{ task.status }}">
+                    <div class="task-header">
+                        <h3>{{ task.title }}</h3>
+                        <span class="priority-badge {{ task.priority }}">{{ task.priority }}</span>
+                    </div>
+                    <p>{{ task.description }}</p>
+                    <div class="task-footer">
+                        <select class="status-select" onchange="updateTaskStatus('{{ task.id }}', this.value)">
+                            <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>Đang chờ</option>
+                            <option value="in-progress" {% if task.status == 'in-progress' %}selected{% endif %}>Đang làm</option>
+                            <option value="completed" {% if task.status == 'completed' %}selected{% endif %}>Hoàn thành</option>
+                        </select>
+                        <span class="task-date">{{ task.created_at }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="info">
+            <h2>Thông tin hệ thống</h2>
+            <ul>
+                <li>Phiên bản: <strong>{{ version }}</strong></li>
+                <li>Hostname: <code>{{ system_info.hostname }}</code></li>
+                <li>Thời gian: <code>{{ system_info.timestamp }}</code></li>
+            </ul>
+        </div>
+
+        <nav>
+            <a href="/">Trang chủ</a> | 
+            <a href="/about">Giới thiệu</a> |
+            <a href="/api/health" target="_blank">Health Check API</a>
+        </nav>
+    </div>
+
+    <script>
+        // Xử lý submit form
+        document.getElementById('taskForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const task = {
+                title: document.getElementById('taskTitle').value,
+                description: document.getElementById('taskDescription').value,
+                priority: document.getElementById('taskPriority').value
+            };
+
+            try {
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(task)
+                });
+                if (response.ok) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        };
+
+        // Cập nhật trạng thái task
+        async function updateTaskStatus(taskId, status) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status })
+                });
+                if (response.ok) {
+                    const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+                    taskCard.setAttribute('data-status', status);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Lọc tasks
+        function filterTasks(status) {
+            const tasks = document.querySelectorAll('.task-card');
+            tasks.forEach(task => {
+                if (status === 'all' || task.getAttribute('data-status') === status) {
+                    task.style.display = 'block';
+                } else {
+                    task.style.display = 'none';
+                }
+            });
+
+            // Update active filter button
+            document.querySelectorAll('.task-filters button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
