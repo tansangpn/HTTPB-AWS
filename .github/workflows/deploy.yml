@@ -30,6 +30,7 @@ jobs:
         pytest test_app.py -v
 
   deploy:
+    
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -37,6 +38,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
+    # 1. Cấu hình AWS credentials 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -44,49 +46,31 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
     
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        envs: FLASK_SECRET_KEY
+    # 2. Đăng nhập vào Amazon ECR (Mới)
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    # 3. Build, Tag, và Push ảnh lên ECR (Mới)
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+
+        ECR_REPOSITORY_URI:378388076859.dkr.ecr.ap-southeast-2.amazonaws.com/task-tracker
         
-        # ===  KỊCH BẢN CHO UBUNTU ===
+        # Dùng mã commit làm tag cho phiên bản (để dễ theo dõi)
+      IMAGE_TAG: ${{ github.sha }} 
+      run: |
+        # 1. Build ảnh Docker
+        docker build -t task-tracker .
         
-        script: |
-          echo "Deploying at $(date -u '+%Y-%m-%d %H:%M:%S')"
-          
-          # 1. Cài đặt Git và Docker bằng apt
-          sudo apt update -y
-          sudo apt install docker.io git -y
-          
-          # 2. Clone hoặc cập nhật code
-          # Tự động clone repo hiện tại (repo của bạn)
-          cd ~/task-tracker || git clone $GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git ~/task-tracker
-          cd ~/task-tracker
-          git fetch
-          git reset --hard origin/main
-          
-          # 3. Sửa lỗi Permission: Chạy các lệnh docker bằng 'sudo'
-          
-          # Đảm bảo volume tồn tại
-          sudo docker volume create task-tracker-data
-          
-          # Dừng và xóa container cũ
-          sudo docker stop task-tracker || true
-          sudo docker rm task-tracker || true
-          
-          # Build ảnh mới
-          sudo docker build -t task-tracker .
-          
-          # Chạy container mới với các biến môi trường
-          sudo docker run -d \
-            --name task-tracker \
-            -p 8080:8080 \
-            -v task-tracker-data:/app/instance \
-            -e SECRET_KEY="${FLASK_SECRET_KEY}" \
-            -e FLASK_ENV=production \
-            -e PYTHONUNBUFFERED=1 \
-            --restart unless-stopped \
-            task-tracker
+        # 2. Gắn tag cho ảnh
+        # Gắn tag 'latest'
+        docker tag task-tracker:latest $ECR_REPOSITORY_URI:latest
+        # Gắn tag phiên bản (dùng mã commit)
+        docker tag task-tracker:latest $ECR_REPOSITORY_URI:$IMAGE_TAG
+        
+        # 3. Đẩy (push) 2 tag này lên ECR
+        echo "Pushing image to ECR..."
+        docker push $ECR_REPOSITORY_URI:latest
+        docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
+        echo "Push complete!"
