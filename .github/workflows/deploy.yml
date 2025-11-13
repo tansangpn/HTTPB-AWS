@@ -55,10 +55,10 @@ jobs:
     - name: Build, tag, and push image to Amazon ECR
       env:
 
-        ECR_REPOSITORY_URI:378388076859.dkr.ecr.ap-southeast-2.amazonaws.com/task-tracker
+        ECR_REPOSITORY_URI: 378388076859.dkr.ecr.ap-southeast-2.amazonaws.com/task-tracker
         
         # Dùng mã commit làm tag cho phiên bản (để dễ theo dõi)
-      IMAGE_TAG: ${{ github.sha }} 
+        IMAGE_TAG: ${{ github.sha }} 
       run: |
         # 1. Build ảnh Docker
         docker build -t task-tracker .
